@@ -4,6 +4,7 @@ djangogcal.observer
 
 """
 
+from celery.task import task
 from django.db.models import signals
 from gdata.calendar import SendEventNotifications
 from gdata.calendar.data import CalendarEventEntry
@@ -56,13 +57,13 @@ class CalendarObserver(object):
         """
         Called by Django's signal mechanism when an observed model is updated.
         """
-        self.update(kwargs['sender'], kwargs['instance'])
+        self.update.delay(self, kwargs['sender'], kwargs['instance'])
     
     def on_delete(self, **kwargs):
         """
         Called by Django's signal mechanism when an observed model is deleted.
         """
-        self.delete(kwargs['sender'], kwargs['instance'])
+        self.delete.delay(self, kwargs['sender'], kwargs['instance'])
     
     def get_client(self):
         """
@@ -86,7 +87,8 @@ class CalendarObserver(object):
         except Exception:
             event = None
         return event
-    
+
+    @task
     def update(self, sender, instance):
         """
         Update or create an entry in Google Calendar for the given instance
@@ -107,7 +109,8 @@ class CalendarObserver(object):
                 new_event = client.InsertEvent(event, insert_uri=feed)
                 CalendarEvent.objects.set_event_id(instance, feed,
                                                    new_event.get_edit_link().href)
-    
+
+    @task
     def delete(self, sender, instance):
         """
         Delete the entry in Google Calendar corresponding to the given instance
