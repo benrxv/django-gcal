@@ -48,7 +48,7 @@ class CalendarEventData(object):
             end=format_datetime(self.end)
         )]
         if self.reminder_minutes and not event.when.reminder:
-            event.when.reminder = [Reminder(minutes=reminder_minutes))]
+            event.when.reminder = [Reminder(minutes=self.reminder_minutes)]
         event.title = Title(text=self.title)
         event.where = [CalendarWhere(value_string=x) for x in self.where]
         event.who = [EventWho(email=x) for x in self.who]
