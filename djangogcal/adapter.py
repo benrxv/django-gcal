@@ -7,6 +7,7 @@ djangogcal.adapter
 from datetime import datetime
 
 from atom.data import Content, Title
+from gdata.data import Reminder
 from gdata.calendar.data import When, CalendarWhere, EventWho
 from django.utils.tzinfo import FixedOffset, LocalTimezone
 
@@ -26,7 +27,7 @@ class CalendarEventData(object):
     objects which can be transmitted to Google services.
     """
     
-    def __init__(self, start, end, title="", where=None, who=None, content=""):
+    def __init__(self, start, end, title="", where=None, who=None, content="", reminder_minutes=None):
         """
         Instantiates a new instance of CalendarEventData.
         """
@@ -36,6 +37,7 @@ class CalendarEventData(object):
         self.where = where or []
         self.who = who or []
         self.content = content
+        self.reminder_minutes = reminder_minutes
     
     def populate_event(self, event):
         """
@@ -45,10 +47,12 @@ class CalendarEventData(object):
             start=format_datetime(self.start),
             end=format_datetime(self.end)
         )]
+        if self.reminder_minutes and not event.when.reminder:
+            event.when.reminder = [Reminder(minutes=reminder_minutes))]
         event.title = Title(text=self.title)
         event.where = [CalendarWhere(value_string=x) for x in self.where]
         event.who = [EventWho(email=x) for x in self.who]
-        event.content = Content(text=self.content)
+        event.content = Content(text=self.content)            
 
 class RawCalendarEventData(object):
     """
