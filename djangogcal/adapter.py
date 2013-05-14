@@ -43,12 +43,11 @@ class CalendarEventData(object):
         """
         Populates the parameters of a Google Calendar event object.
         """
-        event.when = [When(
-            start=format_datetime(self.start),
-            end=format_datetime(self.end)
-        )]
-        if self.reminder_minutes and not event.when[0].reminder:
-            event.when[0].reminder = [Reminder(minutes=self.reminder_minutes)]
+
+        when  = When(start=format_datetime(self.start), end=format_datetime(self.end))
+        if self.reminder_minutes:
+            when.reminder = [Reminder(minutes=str(self.reminder_minutes))]
+        event.when = [when]
         event.title = Title(text=self.title)
         event.where = [CalendarWhere(value_string=x) for x in self.where]
         event.who = [EventWho(email=x) for x in self.who]
