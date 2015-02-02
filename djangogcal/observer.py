@@ -3,7 +3,8 @@ djangogcal.observer
 
 
 """
-
+from dvm.celery import app
+from celery.contrib.methods import task_method
 from celery.task import task
 from django.db.models import signals
 from gdata.calendar import SendEventNotifications
@@ -62,30 +63,23 @@ class CalendarObserver(object):
         """
         Called by Django's signal mechanism when an observed model is updated.
         """
-        self.get_client()
-        self.update.delay(self, kwargs['sender'], kwargs['instance'])
+        self.update.delay(kwargs['sender'], kwargs['instance'])
     
     def on_delete(self, **kwargs):
         """
         Called by Django's signal mechanism when an observed model is deleted.
         """
-        self.get_client()
-        self.delete.delay(self, kwargs['sender'], kwargs['instance'])
+        self.delete.delay(kwargs['sender'], kwargs['instance'])
     
     def get_client(self):
         """
         Get an authenticated gdata.calendar.client.CalendarClient instance.
         """
         token = self.get_access_token()
-        if self.client is None:
-            credentials = AccessTokenCredentials(token, 'vetware/1.0')
-            # credentials = SignedJwtAssertionCredentials(self.email, self.private_key,
-            #                                             "https://www.googleapis.com/auth/calendar")
-            http = credentials.authorize(Http())
-            # self.client = CalendarClient(source='django-gcal')
-            # self.client.ClientLogin(self.email, self.password, self.client.source)
-            self.client = build('calendar', 'v3', http=http)
-        return self.client
+        credentials = AccessTokenCredentials(token, 'vetware/1.0')
+        http = credentials.authorize(Http())
+        client = build('calendar', 'v3', http=http)
+        return client
 
     def get_access_token(self):
         url = "https://accounts.google.com/o/oauth2/token"
@@ -101,23 +95,22 @@ class CalendarObserver(object):
         self.access_token = resp_data['access_token']
         return self.access_token
 
-    def get_event(self, instance, feed=None):
+    def get_event(self, instance, client, feed=None):
         """
         Retrieves the specified event from Google Calendar, or returns None
         if the retrieval fails.
         """
         if feed is None:
             feed = self.feed
-        if self.client is None:
-            self.get_client()
+        client = self.get_client()
         event_id = CalendarEvent.objects.get_event_id(instance, feed)
         try:
-            event = self.client.events().get(calendarId=feed, eventId=event_id).execute()
+            event = client.events().get(calendarId=feed, eventId=event_id).execute()
         except Exception:
             event = None
         return event
 
-    @task(ignore_result=True)
+    @app.task(filter=task_method, ignore_result=False)
     def update(self, sender, instance):
         """
         Update or create an entry in Google Calendar for the given instance
@@ -127,7 +120,7 @@ class CalendarObserver(object):
         if adapter.can_save(instance):
             client = self.get_client()
             feed = adapter.get_feed_url(instance) or self.feed
-            event_data = self.get_event(instance) or {}
+            event_data = self.get_event(instance, client) or {}
             new_event_data = adapter.get_event_data(instance).populate_event(event_data)
             event_id = new_event_data.get('id')
             if event_id:
@@ -139,7 +132,7 @@ class CalendarObserver(object):
                 CalendarEvent.objects.set_event_id(instance, feed,
                                                    created_event['id'])
 
-    @task(ignore_result=True)
+    @app.task(filter=task_method, ignore_result=False)
     def delete(self, sender, instance):
         """
         Delete the entry in Google Calendar corresponding to the given instance
@@ -150,15 +143,7 @@ class CalendarObserver(object):
         if adapter.can_delete(instance):
             client = self.get_client()
             event_id = CalendarEvent.objects.get_event_id(instance, feed)
-            print "Event id is '%s" % event_id
             if event_id:
                 client.events().delete(calendarId=feed, eventId=event_id).execute()
         CalendarEvent.objects.delete_event_id(instance, feed)
 
-from django.conf import settings
-
-refresh_token = "1/Zqbn36RZl4bbC2g_XiC_16N8-cR_05rNn82Ijl1P2nc"
-
-ctest = CalendarObserver(settings.GCAL_EMAIL,
-                         settings.GCAL_SECRET_KEY,
-                         refresh_token=refresh_token)
