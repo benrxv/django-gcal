@@ -9,7 +9,7 @@ from datetime import datetime
 from atom.data import Content, Title
 from gdata.data import Reminder
 from gdata.calendar.data import When, CalendarWhere, EventWho
-from django.utils.tzinfo import FixedOffset, LocalTimezone
+from django.utils.timezone import FixedOffset, LocalTimezone
 
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S.000Z'
 
@@ -19,7 +19,7 @@ def format_datetime(date):
     A utility method that converts the datetime to UTC serialized
     for Google Calendar.
     """
-    local = date.replace(tzinfo=LocalTimezone(date))
+    local = date.replace(tzinfo=LocalTimezone())
     return local.astimezone(FixedOffset(0)).strftime(DATE_FORMAT)
 
 
@@ -50,8 +50,8 @@ class CalendarEventData(object):
 
         new_event_data = {
             'summary': self.title,
-            'location': self.location,
-            'description': self.description,
+            'location': event_data.get('location', self.location),
+            'description': event_data.get('description', self.description),
             'start': {
                 'dateTime': format_datetime(self.start)
             },

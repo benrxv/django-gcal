@@ -4,7 +4,7 @@ djangogcal.models
 
 """
 
-from django.contrib.contenttypes import generic
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
@@ -58,7 +58,7 @@ class CalendarEvent(models.Model):
     # django.contrib.contenttypes 'magic'
     content_type = models.ForeignKey(ContentType)
     object_id = models.PositiveIntegerField()
-    object = generic.GenericForeignKey()
+    object = GenericForeignKey()
     
     # google calendar event_id and feed_id
     event_id = models.CharField(max_length=255)

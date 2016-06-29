@@ -11,8 +11,6 @@ from httplib2 import Http
 from apiclient.discovery import build
 import requests
 
-from models import CalendarEvent
-
 
 class CalendarObserver(object):
     """
@@ -30,7 +28,14 @@ class CalendarObserver(object):
         self.private_key = private_key
         self.feed = feed
         self.client = client
-    
+        self.model = None
+
+    def get_model(self):
+        if not self.model:
+            from models import CalendarEvent
+            self.model = CalendarEvent
+        return self.model
+
     def observe(self, model, adapter):
         """
         Establishes a connection between the model and Google Calendar, using
@@ -99,7 +104,7 @@ class CalendarObserver(object):
         if feed is None:
             feed = self.feed
         client = self.get_client()
-        event_id = CalendarEvent.objects.get_event_id(instance, feed)
+        event_id = self.get_model().objects.get_event_id(instance, feed)
         try:
             event = client.events().get(calendarId=feed, eventId=event_id).execute()
         except Exception:
@@ -125,7 +130,7 @@ class CalendarObserver(object):
             else:
                 created_event = client.events().insert(calendarId=feed,
                                                        body=new_event_data).execute()
-                CalendarEvent.objects.set_event_id(instance, feed,
+                self.get_model().objects.set_event_id(instance, feed,
                                                    created_event['id'])
 
     @app.task(filter=task_method, ignore_result=False)
@@ -138,8 +143,8 @@ class CalendarObserver(object):
         feed = adapter.get_feed_url(instance) or self.feed
         if adapter.can_delete(instance):
             client = self.get_client()
-            event_id = CalendarEvent.objects.get_event_id(instance, feed)
+            event_id = self.get_model().objects.get_event_id(instance, feed)
             if event_id:
                 client.events().delete(calendarId=feed, eventId=event_id).execute()
-        CalendarEvent.objects.delete_event_id(instance, feed)
+        self.get_model().objects.delete_event_id(instance, feed)
 
