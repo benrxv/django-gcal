@@ -3,12 +3,10 @@ djangogcal.observer
 
 
 """
-from dvm.celery import app
-from celery.contrib.methods import task_method
 from django.db.models import signals
 from oauth2client.client import AccessTokenCredentials
 from httplib2 import Http
-from apiclient.discovery import build
+from googleapiclient.discovery import build
 import requests
 
 
@@ -92,7 +90,7 @@ class CalendarObserver(object):
         }
         resp = requests.post(url, data=payload)
         resp_data = resp.json()
-        print resp_data
+        print(resp_data)
         self.access_token = resp_data['access_token']
         return self.access_token
 
@@ -111,7 +109,6 @@ class CalendarObserver(object):
             event = None
         return event
 
-    @app.task(filter=task_method, ignore_result=False)
     def update(self, sender, instance):
         """
         Update or create an entry in Google Calendar for the given instance
@@ -131,9 +128,8 @@ class CalendarObserver(object):
                 created_event = client.events().insert(calendarId=feed,
                                                        body=new_event_data).execute()
                 self.get_model().objects.set_event_id(instance, feed,
-                                                   created_event['id'])
+                                                      created_event['id'])
 
-    @app.task(filter=task_method, ignore_result=False)
     def delete(self, sender, instance):
         """
         Delete the entry in Google Calendar corresponding to the given instance
